@@ -8,7 +8,7 @@ if ($_SESSION['auth'] == false) {
 }
 
 // Проверяем, установлена ли переменная сессии 'login'
-if (!isset($_SESSION['login'])) {
+if ($_SESSION['login'] == null) {
     header('Location: login.php');
     exit;
 }
@@ -34,13 +34,23 @@ $stmt = $connectdb->prepare("SELECT  *  FROM users WHERE email = ? OR phone = ?"
 $stmt->bind_param("ss", $login, $login);
 $stmt->execute();
 $result = $stmt->get_result();
-$user = $result->fetch_assoc();
+
 
 if ($result->num_rows > 0) {
-    $user = $result->fetch_assoc();
+    // Извлекаем данные пользователя
+    while ($user = $result->fetch_assoc()) {
+        echo "<h1>Данные профиля</h1>";
+        echo "<p>Имя: " . htmlspecialchars($user['name']) . "</p>";
+        echo "<p>Номер телефона: " . htmlspecialchars($user['phone']) . "</p>";
+        echo "<p>Почта: " . htmlspecialchars($user['email']) . "</p>";
+    }
 } else {
-    die("Пользователь не найден.");
+    // Если данных нет, выводим соответствующее сообщение
+    echo "Пользователь с таким логином не найден.";
 }
+
+
+$user = $result->fetch_assoc();
 
 // обрабатываем форму
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -53,9 +63,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (!empty($new_password) && $new_password == $_POST['confirm_new_password']) {
         $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
 
-        // обновляем данные в бд
-        $query_update = "UPDATE users SET name = '$name', phone = '$phone', email = '$email', password = '$hashed_password' WHERE name = '$name'";
-        $result_update = $connectdb->query($query_update);
+		$stmt = $connectdb->prepare("UPDATE users SET name = ?, phone = ?, email = ?, password = ? WHERE email = ? OR phone = ?");
+		$stmt->bind_param("ssssss", $name, $phone, $email, $hashed_password, $login, $login);
+		$stmt->execute();
+		$result_update = $stmt->affected_rows;
 
         if ($result_update) {
             echo "Данные успешно обновлены.";
@@ -78,12 +89,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Профиль пользователя</title>
 </head>
 <body>
-    <h1>Профиль пользователя</h1>
-
+	 <h3>Изменить данные профиля</h3>
     <form action="profile.php" method="post">
-      Имя: <input type="text" name="name" value="<?php echo htmlspecialchars($user['name']); ?>"><br>
-      Телефон: <input type="text" name="phone" value="<?php echo htmlspecialchars($user['phone']); ?>"><br>
-      Почта: <input type="email" name="email" value="<?php echo htmlspecialchars($user['email']); ?>"><br>
+      Имя: <input type="text" name="name">"><br>
+      Телефон: <input type="text" name="phone">"><br>
+      Почта: <input type="email" name="email">"><br>
       Новый пароль: <input type="password" name="new_password"><br>
       Повторите новый пароль: <input type="password" name="confirm_new_password"><br>
       <input type="submit" value="Обновить">
